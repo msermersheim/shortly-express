@@ -3,7 +3,7 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
-
+var Bookshelf = require('bookshelf');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -50,7 +50,7 @@ app.get('/create', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/links', function(req, res) {
+app.get('/links', restrict, function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.status(200).send(links.models);
   });
@@ -98,19 +98,25 @@ app.post('/links', function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
-app.post('/login', function(request, response) {
- 
-  var username = request.body.username;
-  var password = request.body.password;
- 
-  if (username === 'demo' && password === 'demo') {
-    request.session.regenerate(function() {
-      request.session.user = username;
-      response.redirect('/');
-    });
-  } else {
-    response.redirect('login');
-  }    
+app.post('/login', function(req, res) {
+  new User({username: req.body.username, password: req.body.password}).fetch().then(function(err, login) {
+    var username = req.body.username;
+    var password = req.body.password;
+    if (!login) {
+      res.send(err);
+    } else if (username === user.username) {
+      res.redirect('/');
+    } 
+  });
+ // console.log(req.body);
+  // if (username === 'demo' && password === 'demo') {
+  //   req.session.regenerate(function() {
+  //     req.session.user = username;
+  //     res.redirect('/');
+  //   });
+  // } else {
+  //   res.redirect('login');
+  // }    
 });
 
 
@@ -118,19 +124,40 @@ app.get('/signup', function(req, res) {
   res.render('signup');
 });
 
-app.post('/signup', function(req, res) {
-  if (req.body.username && req.body.password) {
-        // check username and password
-    if (authenticated) {
-          // create a token and store it with the current date (if you want it to expire)
-      var token = generateAndStoreRandomString(req.body.username);
-      res.redirect('/' + token);
-      return;
-    }
-        // Do something if username or password wrong
-  }
-    // Do s
+
+app.post('/signup', function (req, res) {
+  new User({username: req.body.username}).fetch().then(function(signup) {
+    debugger;
+    console.log(User);
+    var user = new User({
+      username: req.body.username,
+      password: req.body.password
+    });
+    console.log(user);
+    user.save().then(function() {
+      req.session.regenerate(function() {
+        req.session.user = req.body.username;
+        res.redirect('/');
+      });
+    }).catch(function(err) {
+      throw {
+        type: 'DatabaseError',
+        message: 'failed to create test setup data'
+      };
+    });
+  });
 });
+  // console.log(user);
+  // var UserReg = bookshelf.model('UserReg', users);
+  // console.log(UserReg);
+  // UserReg.create(user, function(err, newUser) {
+  //   if (err) {
+  //     return next(err);
+  //   }
+  //   req.session.user = email;
+    // return res.render('login');
+
+
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail

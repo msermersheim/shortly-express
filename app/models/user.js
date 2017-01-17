@@ -8,7 +8,7 @@ var Click = require('./click');
 
 
 var User = db.Model.extend({
-  tableName: 'user',
+  tableName: 'users',
   hasTimestamps: true
 });
 
