@@ -2,6 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 
 var db = require('./app/config');
@@ -11,7 +12,9 @@ var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
+
 var app = express();
+
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -21,27 +24,47 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: true}
+}));
 
 
-app.get('/', 
-function(req, res) {
+var restrict = function (req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+};
+
+ 
+app.get('/', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/create', 
-function(req, res) {
+app.get('/create', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/links', 
-function(req, res) {
+app.get('/links', function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.status(200).send(links.models);
   });
 });
 
-app.post('/links', 
-function(req, res) {
+app.get('/login', function(req, res) {
+  res.render('login');
+});
+
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
+app.post('/links', function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -75,8 +98,39 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.post('/login', function(request, response) {
+ 
+  var username = request.body.username;
+  var password = request.body.password;
+ 
+  if (username === 'demo' && password === 'demo') {
+    request.session.regenerate(function() {
+      request.session.user = username;
+      response.redirect('/');
+    });
+  } else {
+    response.redirect('login');
+  }    
+});
 
 
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res) {
+  if (req.body.username && req.body.password) {
+        // check username and password
+    if (authenticated) {
+          // create a token and store it with the current date (if you want it to expire)
+      var token = generateAndStoreRandomString(req.body.username);
+      res.redirect('/' + token);
+      return;
+    }
+        // Do something if username or password wrong
+  }
+    // Do s
+});
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
