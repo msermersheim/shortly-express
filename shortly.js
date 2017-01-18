@@ -4,6 +4,7 @@ var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
 var Bookshelf = require('bookshelf');
+var bcrypt = require('bcrypt'); 
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -40,6 +41,12 @@ var restrict = function (req, res, next) {
     res.redirect('/login');
   }
 };
+var createSession = function(req, res, newUser) {
+  return req.session.regenerate(function() {
+    req.session.user = newUser;
+    res.redirect('/');
+  });
+};
 
  
 app.get('/', restrict, function(req, res) {
@@ -51,9 +58,13 @@ app.get('/create', restrict, function(req, res) {
 });
 
 app.get('/links', restrict, function(req, res) {
+  //if (req.cookie.post) {
   Links.reset().fetch().then(function(links) {
     res.status(200).send(links.models);
   });
+  //} else {
+    //res.redirect('/login');
+  //}
 });
 
 app.get('/login', function(req, res) {
@@ -99,24 +110,24 @@ app.post('/links', function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 app.post('/login', function(req, res) {
-  new User({username: req.body.username, password: req.body.password}).fetch().then(function(err, login) {
-    var username = req.body.username;
-    var password = req.body.password;
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({username: req.body.username}).fetch().then(function(login) {
     if (!login) {
-      res.send(err);
-    } else if (username === user.username) {
       res.redirect('/');
-    } 
+    } else {
+      console.log(login);
+     
+      (password, login.get('password'), function(err, match) {
+        if (match) {
+          createSession(req, res, user);
+        } else {
+          res.redirect('/login');
+        }
+      });
+    }    
   });
- // console.log(req.body);
-  // if (username === 'demo' && password === 'demo') {
-  //   req.session.regenerate(function() {
-  //     req.session.user = username;
-  //     res.redirect('/');
-  //   });
-  // } else {
-  //   res.redirect('login');
-  // }    
 });
 
 
@@ -126,25 +137,22 @@ app.get('/signup', function(req, res) {
 
 
 app.post('/signup', function (req, res) {
-  new User({username: req.body.username}).fetch().then(function(signup) {
-    debugger;
-    console.log(User);
-    var user = new User({
-      username: req.body.username,
-      password: req.body.password
-    });
-    console.log(user);
-    user.save().then(function() {
-      req.session.regenerate(function() {
-        req.session.user = req.body.username;
-        res.redirect('/');
+
+  new User({username: req.body.username, password: req.body.password}).fetch().then(function(signup) {
+    //console.log(signup);
+    if (!signup) {
+      //console.log(signup);
+      bcrypt.hash(req.body.password, null, null, function(err, hash) {
+        Users.create({
+          username: username,
+          password: hash
+        }).then(function(user) {
+          createSession(req, res, user);
+        });
       });
-    }).catch(function(err) {
-      throw {
-        type: 'DatabaseError',
-        message: 'failed to create test setup data'
-      };
-    });
+    } else {
+      res.redirect('/signup');
+    }
   });
 });
   // console.log(user);
